@@ -29,12 +29,13 @@ const createRequest = async (req, res) => {
             normalizedQuantity = match ? parseInt(match[0], 10) : 1;
         }
 
-        // Normalize urgency to match DB ENUM ('Normal', 'Urgent', 'Critical')
-        let normalizedUrgency = "Normal";
-        const u = urgency.toLowerCase();
+        // Normalize urgency to match DB ENUM ('Low', 'Medium', 'High', 'Critical')
+        let normalizedUrgency = "Medium";
+        const u = (urgency || "").toLowerCase();
         if (u === "critical") normalizedUrgency = "Critical";
-        else if (u === "high" || u === "urgent") normalizedUrgency = "Urgent";
-        else if (u === "medium" || u === "normal" || u === "low") normalizedUrgency = "Normal";
+        else if (u === "high" || u === "urgent") normalizedUrgency = "High";
+        else if (u === "medium" || u === "normal") normalizedUrgency = "Medium";
+        else if (u === "low") normalizedUrgency = "Low";
 
         // Cap patient_details length
         let safeDetails = patient_details == null ? null : String(patient_details);
@@ -104,7 +105,7 @@ const getHospitalDashboard = async (req, res) => {
 
     try {
         const [responses] = await pool.query(
-            `SELECT d.name, d.phone, d.blood_type, r.status, r.estimated_arrival, r.message, r.responded_at
+            `SELECT r.id as responseId, d.name, d.phone, d.blood_type, r.status, r.estimated_arrival, r.message, r.responded_at
        FROM responses r
        JOIN donors d ON r.donor_id = d.id
        WHERE r.request_id = ?
@@ -144,4 +145,34 @@ const getHospitalRequests = async (req, res) => {
     }
 };
 
-module.exports = { createRequest, getHospitalDashboard, getHospitalRequests };
+const markDonationComplete = async (req, res) => {
+    if (req.user.role !== "hospital") return res.status(403).json({ error: "Access denied" });
+
+    const { responseId } = req.params;
+
+    try {
+        // Verify this response belongs to a request owned by this hospital
+        const [rows] = await pool.query(
+            `SELECT r.id FROM responses res 
+             JOIN requests r ON res.request_id = r.id 
+             WHERE res.id = ? AND r.hospital_id = ?`,
+            [responseId, req.user.id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Response not found or unauthorized" });
+        }
+
+        await pool.query(
+            "UPDATE responses SET status = 'Completed' WHERE id = ?",
+            [responseId]
+        );
+
+        res.json({ message: "Donation marked as completed" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to update donation status" });
+    }
+};
+
+module.exports = { createRequest, getHospitalDashboard, getHospitalRequests, markDonationComplete };

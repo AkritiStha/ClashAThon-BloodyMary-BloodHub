@@ -193,9 +193,9 @@ const Matching = {
     }
   },
 
-  async getHospitalDashboard(requestId) {
+  async getHospitalDashboard(reqId) {
     try {
-      const res = await fetch(`${backendURL}/hospital-dashboard/${requestId}`, {
+      const res = await fetch(`${backendURL}/hospital-dashboard/${reqId}`, {
         headers: { ...Session.getAuthHeaders() }
       });
       const result = await res.json();
@@ -249,6 +249,19 @@ const Matching = {
     try {
       const res = await fetch(`${backendURL}/requests/${requestId}/fulfill`, {
         method: "POST",
+        headers: { ...Session.getAuthHeaders() }
+      });
+      return res.ok;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  },
+
+  async completeDonation(responseId) {
+    try {
+      const res = await fetch(`${backendURL}/complete-donation/${responseId}`, {
+        method: "PATCH",
         headers: { ...Session.getAuthHeaders() }
       });
       return res.ok;

@@ -656,32 +656,60 @@
       <div class="responders-panel" style="margin-top:1rem;">
         <div class="responders-panel-header">
           <span><i class="fas fa-users"></i> Donor Responders — Request #${reqId}</span>
-          <span>${responders.length} ready to donate</span>
+          <span>${responders.length} total responders</span>
         </div>
         <div class="table-wrapper">
           <table>
             <thead>
-              <tr><th>Donor</th><th>Blood Type</th><th>Phone</th><th>Status</th><th>Action</th></tr>
+              <tr><th>Donor</th><th>Blood Type</th><th>Phone</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
               ${responders
           .map(
-            (d) => `
+            (d) => {
+              const rid = d.responseId || d.id || d.responseid;
+              const matchesCompleted = d.status === 'Completed' || d.status === 'Donated';
+              const statusClass = matchesCompleted ? 'fulfilled' : 'active';
+              const statusText = matchesCompleted ? 'Donated' : (d.status || 'Coming');
+
+              return `
                 <tr>
                   <td><strong>${d.name}</strong></td>
                   <td>${bloodBadgeHTML(d.blood_type, "sm")}</td>
                   <td><code>${d.phone}</code></td>
-                  <td><span class="status-badge active"><span class="dot dot-green"></span> Coming</span></td>
-                  <td><button class="btn btn-primary btn-sm" onclick="contactDonor('${d.name}', '${d.phone}')">
-                    <i class="fas fa-phone"></i> Contact
-                  </button></td>
-                </tr>`,
+                  <td><span class="status-badge ${statusClass}">${matchesCompleted ? '<i class="fas fa-check-double"></i> ' : '<span class="dot dot-green"></span> '}${statusText}</span></td>
+                  <td>
+                    <div class="flex gap-2">
+                      <button class="btn btn-primary btn-sm" onclick="contactDonor('${d.name}', '${d.phone}')">
+                        <i class="fas fa-phone"></i> Contact
+                      </button>
+                      ${!matchesCompleted ? `
+                      <button class="btn btn-success btn-sm" onclick="handleMarkDonationComplete(${rid}, '${d.name}')">
+                        <i class="fas fa-check"></i> Mark as Donated
+                      </button>
+                      ` : ''}
+                    </div>
+                  </td>
+                </tr>`;
+            }
           )
           .join("")}
             </tbody>
           </table>
         </div>
       </div>`;
+    }
+
+    async function handleMarkDonationComplete(responseId, donorName) {
+      if (!confirm(`Mark donation by ${donorName} as successfully completed?`)) return;
+
+      const ok = await Matching.completeDonation(responseId);
+      if (ok) {
+        showNotif(`Success! Donation by ${donorName} recorded.`, "success");
+        refreshDashboardData();
+      } else {
+        showNotif("Failed to update status. Please try again.", "error");
+      }
     }
 
     function toggleResponders(reqId) {
