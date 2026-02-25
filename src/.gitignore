@@ -1,0 +1,27 @@
+# Ignore environment secrets 
+.env
+.env.local
+.env.development
+.env.production
+
+# Ignore Node.js dependencies 
+node_modules/
+
+# Ignore logs, temp files, build artifacts
+*.log
+*.log.*
+.DS_Store
+Thumbs.db
+dist/
+build/
+
+# Ignore editor/IDE files
+.vscode/
+.idea/
+*.sublime-projectgit add .gitignore
+git commit -m "Added .gitignore to protect secrets and ignore node_modules"
+*.sublime-workspace
+
+# ignore database dumps or backups
+*.sql.bak
+*.dump
