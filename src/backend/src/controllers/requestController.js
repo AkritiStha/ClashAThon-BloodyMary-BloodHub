@@ -58,30 +58,43 @@ const createRequest = async (req, res) => {
         const requestId = result.insertId;
 
         // Find matching donors
+        console.log(`Searching for donors: blood_type=${blood_type}, city=${city}`);
         const [donors] = await pool.query(
             "SELECT email, name FROM donors WHERE blood_type = ? AND city = ? AND available = TRUE",
             [blood_type, city],
         );
+        console.log(`Found ${donors.length} matching donors.`);
 
         // Send emails
-        const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS,
-            },
-        });
+        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+            const transporter = nodemailer.createTransport({
+                host: "smtp.gmail.com",
+                port: 587,
+                secure: false, // MUST be false for 587
+                auth: {
+                    user: process.env.EMAIL_USER,
+                    pass: process.env.EMAIL_PASS, // Gmail App Password
+                },
+                tls: {
+                    rejectUnauthorized: false
+                },
+                debug: true,
+                logger: true
+            });
+            console.log("Emails sent successfully");
 
-        for (const donor of donors) {
-            try {
-                await transporter.sendMail({
-                    from: `"BLOODHUB" <${process.env.EMAIL_USER}>`,
-                    to: donor.email,
-                    subject: `URGENT Blood Request: ${blood_type} in ${city}`,
-                    text: `Hello ${donor.name},\n\nA hospital in ${city} urgently needs ${blood_type} blood.\nDetails: ${patient_details || "Emergency case"}\n\nRespond here: http://localhost:5500/respond.html?requestId=${requestId}\n\nThank you for being a lifesaver!`,
-                });
-            } catch (emailErr) {
-                console.error("Email failed to", donor.email, emailErr);
+            for (const donor of donors) {
+                try {
+                    console.log(`Sending email to ${donor.email}...`);
+                    await transporter.sendMail({
+                        from: `"BLOODHUB" <${process.env.EMAIL_USER}>`,
+                        to: donor.email,
+                        subject: `URGENT Blood Request: ${blood_type} in ${city}`,
+                        text: `Hello ${donor.name},\n\nA hospital in ${city} urgently needs ${blood_type} blood.\nDetails: ${safeDetails || "Emergency case"}\n\nThank you for being a lifesaver!`,
+                    });
+                } catch (emailErr) {
+                    console.error("Email failed to", donor.email, emailErr);
+                }
             }
         }
 

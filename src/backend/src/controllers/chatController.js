@@ -1,9 +1,8 @@
-// controllers/chatController.js
 const pool = require("../config/db");
+const axios = require("axios");
 require("dotenv").config();
 
-const MODELS = [
-    "google/gemma-3-4b-it:free"
+const MODELS = ["google/gemma-3-4b-it:free"
 ];
 
 const SYSTEM_PROMPT = `You are the BLOODHUB AI Assistant, an expert helper for Nepal's blood donation platform.
@@ -74,6 +73,9 @@ ${activeRequests.length > 0
 
             if (result.ok) return res.json(result.data);
 
+            console.error(`AI Model Failure (${model}):`, result.error);
+            lastError = result.error;
+
             // Fallback: If "Developer instruction" error, try merging system prompt into user message
             if (result.error && JSON.stringify(result.error).includes("Developer instruction")) {
                 console.warn(`Fallback for model ${model}: merging system prompt into user message`);
@@ -82,13 +84,16 @@ ${activeRequests.length > 0
                     { role: "user", content: `Instructions: ${dynamicSystemPrompt}\n\nUser Message: ${message}` }
                 ]);
                 if (fallbackResult.ok) return res.json(fallbackResult.data);
+                console.error(`AI Model Fallback Failure (${model}):`, fallbackResult.error);
                 lastError = fallbackResult.error;
-            } else {
-                lastError = result.error;
             }
         }
 
-        res.status(500).json({ error: "AI Assistant unavailable.", details: lastError });
+        res.status(500).json({
+            error: "AI Assistant unavailable.",
+            message: "Our AI providers are currently at capacity or experiencing issues.",
+            details: lastError
+        });
 
     } catch (dbErr) {
         console.error("Database error in Chat Controller:", dbErr);
@@ -106,32 +111,52 @@ async function handleStaticChat(req, res, message, history, apiKey) {
             { role: "user", content: message }
         ]);
         if (result.ok) return res.json(result.data);
+        console.error(`AI Static Chat Failure (${model}):`, result.error);
         lastError = result.error;
     }
-    res.status(500).json({ error: "AI Assistant unavailable.", details: lastError });
+    res.status(500).json({
+        error: "AI Assistant unavailable.",
+        message: "Our AI providers are currently at capacity or experiencing issues.",
+        details: lastError
+    });
 }
 
 async function tryModel(model, apiKey, messages) {
     try {
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:3300",
-                "X-Title": "BLOODHUB Assistant",
-            },
-            body: JSON.stringify({ model, messages })
-        });
+        console.log(`[AI Chat] Calling OpenRouter: ${model}...`);
+        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions",
+            { model, messages },
+            {
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "http://localhost:3300",
+                    "X-Title": "BLOODHUB Assistant",
+                },
+                timeout: 10000
+            }
+        );
 
-        const data = await response.json();
-        if (!response.ok || data.error) return { ok: false, error: data.error || data };
+        const data = response.data;
+        if (data.error) {
+            console.error(`[AI Chat] ${model} API Error:`, data.error);
+            return { ok: false, error: data.error };
+        }
 
+        if (!data.choices || !data.choices[0]) {
+            console.error(`[AI Chat] ${model} empty response. Full body:`, JSON.stringify(data));
+            return { ok: false, error: "Empty response" };
+        }
+
+        console.log(`[AI Chat] ${model} Success!`);
         return {
             ok: true,
             data: { response: data.choices[0].message.content, model }
         };
     } catch (err) {
-        return { ok: false, error: err.message };
+        const status = err.response ? err.response.status : "No Status";
+        const errorData = err.response ? JSON.stringify(err.response.data) : err.message;
+        console.error(`[AI Chat] ${model} HTTP ${status} Error:`, errorData);
+        return { ok: false, error: `HTTP ${status}: ${errorData}` };
     }
 }

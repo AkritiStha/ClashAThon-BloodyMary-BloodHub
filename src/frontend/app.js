@@ -52,9 +52,13 @@ const Session = {
     const token = this.getToken();
     return token ? { "Authorization": `Bearer ${token}` } : {};
   },
-  // Legacy support for scripts expecting liveHospital/liveDonor
-  liveDonor() { return this.getUser(); },
-  liveHospital() { return this.getUser(); }
+  // Role-aware session helpers
+  liveDonor() {
+    return (this.getUser() && this.getRole() === 'donor') ? this.getUser() : null;
+  },
+  liveHospital() {
+    return (this.getUser() && this.getRole() === 'hospital') ? this.getUser() : null;
+  }
 };
 
 // ─── VALIDATION ───────────────────────────────────────────────────────────
@@ -268,6 +272,21 @@ const Matching = {
     } catch (e) {
       console.error(e);
       return false;
+    }
+  },
+
+  async getDonationHistory() {
+    try {
+      const res = await fetch(`${backendURL}/donation-history`, {
+        headers: { ...Session.getAuthHeaders() }
+      });
+      const result = await res.json();
+      console.log("donation history", result);
+      if (!res.ok) return [];
+      return result.history || result;
+    } catch (e) {
+      console.error(e);
+      return [];
     }
   }
 };

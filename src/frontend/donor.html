@@ -286,16 +286,18 @@
                 <i class="fas fa-history" style="color: var(--info)"></i>
                 Donation History
               </h3>
-              <div class="card">
-                <p style="
-                      color: var(--gray-400);
-                      font-size: 0.9rem;
-                      text-align: center;
-                      padding: 1rem;
-                    ">
-                  No donation records yet. Your completed donations will
-                  appear here.
-                </p>
+              <div id="donation-history-container">
+                <div class="card">
+                  <p style="
+                        color: var(--gray-400);
+                        font-size: 0.9rem;
+                        text-align: center;
+                        padding: 1rem;
+                      ">
+                    No donation records yet. Your completed donations will
+                    appear here.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -462,8 +464,10 @@
 
     async function refreshDashboardData() {
       currentRequests = await Matching.getRequestsForDonor();
+      const history = await Matching.getDonationHistory();
       renderMatchingRequests();
       renderMyResponses();
+      renderDonationHistory(history);
     }
 
     function populateDashboard() {
@@ -587,6 +591,51 @@
           </div>
           <span class="status-badge active" style="margin-left:auto;"><span class="dot dot-green"></span> Awaiting Contact</span>
         </div>
+      </div>`,
+        )
+        .join("");
+    }
+
+    // ── Donation History ────────────────────────────────────
+    function renderDonationHistory(history) {
+      const box = document.getElementById("donation-history-container");
+      if (!Array.isArray(history) || history.length === 0) {
+        box.innerHTML = `
+        <div class="card">
+          <p style="color:var(--gray-400); font-size:0.9rem; text-align:center; padding:1rem;">
+            No donation records yet. Your completed donations will appear here.
+          </p>
+        </div>`;
+        return;
+      }
+
+      box.innerHTML = history
+        .map(
+          (h) => `
+      <div class="card" style="margin-bottom:1rem; border-left: 4px solid var(--success);">
+        <div class="flex-between">
+          <div class="flex gap-2">
+            ${bloodBadgeHTML(h.blood_type, "sm")}
+            <div>
+              <div style="font-weight:600; font-size:0.9rem;">${h.hospitalName}</div>
+           <div style="font-size:0.8rem; color:var(--gray-600);"><i class="fas fa-calendar-check"></i> ${h.responded_at ? new Date(h.responded_at).toLocaleDateString() : 'Completed'}</div>
+                          
+            </div>
+          </div>
+          <span class="chip" style="background: rgba(46, 204, 113, 0.1); color: var(--success); border: 1px solid rgba(46, 204, 113, 0.2);">
+            <i class="fas fa-check-circle"></i> Completed
+          </span>
+        </div>
+       <div style="margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+  <span class="chip"><i class="fas fa-location-dot"></i> ${h.city}</span>
+  <span class="chip"><i class="fas fa-vials"></i> ${h.quantity} units</span>
+  <span class="chip" style="background: rgba(59,130,246,0.08); color: #3b82f6; border: 1px solid rgba(59,130,246,0.2);">
+    <i class="fas fa-calendar-check"></i> 
+    ${h.donationDate
+              ? new Date(h.donationDate).toLocaleDateString('en-NP', { year: 'numeric', month: 'short', day: 'numeric' })
+              : 'Date unavailable'}
+  </span>
+</div>
       </div>`,
         )
         .join("");
