@@ -6,7 +6,7 @@
    ================================================== */
 
 // ─── SEED DATA (used only on very first load) ─────────────────────────────
-const backendURL = "http://localhost:3300";
+const backendURL = "clashathon-bloodymary-bloodhub-production.up.railway.app";
 // No seed data — register manually via the Donor/Hospital portals
 const SEED_DONORS = [];
 const SEED_HOSPITALS = [];
